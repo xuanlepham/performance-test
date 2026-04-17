@@ -1,0 +1,76 @@
+pipeline {
+    // 1. Đẩy Job xuống chạy trên máy Slave có tên (label) là 'jmeter-slave'
+    agent { label 'jmeter-slave' }
+
+    parameters {
+        string(name: 'SCRIPT_FILENAME', defaultValue: 'Flow_01_Login.jmx', description: 'Nhập tên file jmx trong thư mục scripts/')
+    }
+
+    environment {
+        // 2. Đường dẫn cài đặt JMeter trên con SLAVE (Máy Linux)
+        JMETER_HOME = "/opt/apache-jmeter-5.6.3/bin"
+    }
+
+    stages {
+        stage('Load Config & Variables') {
+            steps {
+                script {
+                    // Dùng dấu gạch chéo ngược (/) cho Linux
+                    def jmxPath = "scripts/${params.SCRIPT_FILENAME}"
+                    if (!fileExists(jmxPath)) {
+                        error "LỖI: Không tìm thấy file ${jmxPath}!"
+                    }
+
+                    def loadConfig = readProperties file: 'config/env.properties'
+                    def baseName = params.SCRIPT_FILENAME.replace('.jmx', '')
+
+                    env.BASE_URL = loadConfig["baseUrl"]
+                    env.TARGET_THREADS  = loadConfig["${baseName}_threads"]  ?: '10'
+                    env.TARGET_RAMPUP   = loadConfig["${baseName}_rampup"]   ?: '5'
+                    env.TARGET_DURATION = loadConfig["${baseName}_duration"] ?: '60'
+
+                    echo "Đang test trên Slave: ${env.BASE_URL} | Tải: ${env.TARGET_THREADS} Users"
+                }
+            }
+        }
+
+        stage('Execute JMeter on Slave') {
+            steps {
+                script {
+                    // 3. Chuyển đổi lệnh bat thành sh (Linux)
+                    sh "rm -rf reports/* || true"
+                    sh "mkdir -p reports"
+
+                    def baseName = params.SCRIPT_FILENAME.replace('.jmx', '')
+                    def reportName = "${baseName}_Build_${BUILD_NUMBER}"
+
+                    sh """
+                        ${JMETER_HOME}/jmeter -n -t scripts/${params.SCRIPT_FILENAME} \
+                        -l reports/${reportName}.jtl \
+                        -e -o reports/${reportName}_Dashboard \
+                        -JbaseUrl="${env.BASE_URL}" \
+                        -Jthreads=${env.TARGET_THREADS} \
+                        -Jrampup=${env.TARGET_RAMPUP} \
+                        -Jduration=${env.TARGET_DURATION}
+                    """
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            script {
+                def baseName = params.SCRIPT_FILENAME.replace('.jmx', '')
+                publishHTML([
+                    allowMissing: false,
+                    alwaysLinkToLastBuild: true,
+                    keepAll: true,
+                    reportDir: "reports/${baseName}_Build_${BUILD_NUMBER}_Dashboard",
+                    reportFiles: 'index.html',
+                    reportName: "Báo cáo: ${baseName}"
+                ])
+            }
+        }
+    }
+}
