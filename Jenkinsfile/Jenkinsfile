@@ -1,0 +1,11 @@
+pipeline {
+    agent any
+
+    stages {
+        stage('Run JMeter') {
+            steps {
+                bat 'echo Jenkins is working!'
+            }
+        }
+    }
+}

@@ -1,0 +1,3 @@
+@echo off
+echo Running JMeter test...
+pause
