@@ -47,28 +47,40 @@ pipeline {
                     def jmeterDuration = params.DURATION ?: "0"
 
                     // 2. LOGIC TỰ ĐỘNG LẤY IP TỪ FILE CONFIG RIÊNG CỦA ÔNG
-                    def remoteFlag = ""
-                    if (params.SLAVE_CLUSTER != 'none') {
-                        // Tên file lưu IP của ông là gì thì ông thay vào chữ 'slave_clusters.properties' nhé
-                        def slaveConfig = readProperties file: "config/slave_clusters.properties"
-
-                        def targetIps = slaveConfig[params.SLAVE_CLUSTER]
-                        remoteFlag = "-R ${targetIps}"
-                    }
+                   def remoteFlag = ""
+                                       if (params.SLAVE_CLUSTER != 'none') {
+                                           def slaveConfig = readProperties file: "config/slave_clusters.properties"
+                                           def targetIps = slaveConfig[params.SLAVE_CLUSTER]
+                                           if (targetIps != null && targetIps.trim() != "") {
+                                               remoteFlag = "-R ${targetIps}"
+                                           } else {
+                                               echo "CẢNH BÁO: Không tìm thấy IP cho cụm '${params.SLAVE_CLUSTER}'. Bỏ qua chế độ Slave."
+                                           }
+                                       }
+                    // 3. LOGIC XỬ LÝ URL (GHI ĐÈ HOẶC LẤY TỪ JMX)
+                   def targetUrlFlag = ""
+                                        if (params.TARGET_URL != null && params.TARGET_URL.trim() != "") {
+                                        // Nếu có nhập -> Tạo cờ -JtargetUrl để đè lên file JMX
+                                        targetUrlFlag = "-JtargetUrl=\"${params.TARGET_URL.trim()}\""
+                                        }
+                                        def baseUrlFlag = ""
+                                                            if (finalBaseUrl != "") {
+                                                                baseUrlFlag = "-JbaseUrl=\"${finalBaseUrl}\""
+                                                            }
 
                     // 3. LỆNH CHẠY CHỐT HẠ (Đã bơm đủ đồ chơi)
                     sh """
-                        ${JMETER_HOME}/jmeter -n -t "scripts/${params.SCRIPT_FILENAME}" \
-                        -l "reports/${reportName}.jtl" \
-                        -e -o "reports/${reportName}_Dashboard" \
-                        -JbaseUrl="${env.BASE_URL}" \
-                        -JtargetUrl="${params.TARGET_URL}" \
-                        -Jthreads="${params.THREADS}" \
-                        -Jrampup="${params.RAMP_UP}" \
-                        -Jduration="${jmeterDuration}" \
-                        -Jloops="${jmeterLoops}" \
-                        ${remoteFlag}
-                    """
+                                               ${JMETER_HOME}/jmeter -n -t "scripts/${params.SCRIPT_FILENAME}" \
+                                               -l "reports/${reportName}.jtl" \
+                                               -e -o "reports/${reportName}_Dashboard" \
+                                               ${baseUrlFlag} \
+                                               ${targetUrlFlag} \
+                                               -Jthreads="${params.THREADS}" \
+                                               -Jrampup="${params.RAMP_UP}" \
+                                               -Jduration="${jmeterDuration}" \
+                                               -Jloops="${jmeterLoops}" \
+                                               ${remoteFlag}
+                                           """
                 }
             }
         }
