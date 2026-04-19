@@ -7,14 +7,14 @@ pipeline {
 
     parameters {
         string(name: 'SCRIPT_FILENAME', defaultValue: 'Loadtestdemo.jmx', description: 'Tên file kịch bản trong thư mục scripts/')
-        string(name: 'TARGET_URL', defaultValue: 'parabank.parasoft.com', description: 'Nhập domain server cần test')
+        string(name: 'TARGET_URL', defaultValue: 'parabank.parasoft.com', description: 'Nhập domain server cần test (Để trống sẽ tự động lấy trong script JMX)')
         string(name: 'THREADS', defaultValue: '10', description: 'Số lượng Virtual Users (Number of Threads)')
         string(name: 'RAMP_UP', defaultValue: '5', description: 'Thời gian Ramp-up (giây)')
         string(name: 'LOOPS', defaultValue: '1', description: 'Số vòng lặp (Để trống hoặc -1 nếu chạy theo Duration)')
         string(name: 'DURATION', defaultValue: '300', description: 'Thời gian ngâm tải Duration bằng giây (Để trống nếu chạy theo Loop)')
 
         // MENU XỔ XUỐNG CHỌN CỤM SLAVE
-        choice(name: 'SLAVE_CLUSTER', choices: ['none', 'cụm_1_máy', 'cụm_2_máy', 'cụm_full_3_máy'], description: 'Chọn cụm JMeter Slave (none = Chỉ chạy bằng máy hiện tại)')
+        choice(name: 'SLAVE_CLUSTER', choices: ['none', 'slave_1', 'cụm_2_máy', 'cụm_full_3_máy'], description: 'Chọn cụm JMeter Slave (none = Chỉ chạy bằng máy hiện tại)')
     }
 
     environment {
@@ -38,49 +38,50 @@ pipeline {
                     def baseName = params.SCRIPT_FILENAME.replace('.jmx', '')
                     def reportName = "${baseName}_Build_${BUILD_NUMBER}"
 
-                    // 1. Đọc file env chung để lấy baseUrl
+                    // 1. Đọc file env chung để lấy baseUrl CHUẨN
                     def loadConfig = readProperties file: 'config/env.properties'
-                    env.BASE_URL = loadConfig["baseUrl"]
+                    def finalBaseUrl = loadConfig["baseUrl"] ?: ""
 
                     // Xử lý giá trị an toàn cho Loop và Duration
                     def jmeterLoops = params.LOOPS ?: "1"
                     def jmeterDuration = params.DURATION ?: "0"
 
                     // 2. LOGIC TỰ ĐỘNG LẤY IP TỪ FILE CONFIG RIÊNG CỦA ÔNG
-                   def remoteFlag = ""
-                                       if (params.SLAVE_CLUSTER != 'none') {
-                                           def slaveConfig = readProperties file: "config/slave_clusters.properties"
-                                           def targetIps = slaveConfig[params.SLAVE_CLUSTER]
-                                           if (targetIps != null && targetIps.trim() != "") {
-                                               remoteFlag = "-R ${targetIps}"
-                                           } else {
-                                               echo "CẢNH BÁO: Không tìm thấy IP cho cụm '${params.SLAVE_CLUSTER}'. Bỏ qua chế độ Slave."
-                                           }
-                                       }
-                    // 3. LOGIC XỬ LÝ URL (GHI ĐÈ HOẶC LẤY TỪ JMX)
-                   def targetUrlFlag = ""
-                                        if (params.TARGET_URL != null && params.TARGET_URL.trim() != "") {
-                                        // Nếu có nhập -> Tạo cờ -JtargetUrl để đè lên file JMX
-                                        targetUrlFlag = "-JtargetUrl=\"${params.TARGET_URL.trim()}\""
-                                        }
-                                        def baseUrlFlag = ""
-                                                            if (finalBaseUrl != "") {
-                                                                baseUrlFlag = "-JbaseUrl=\"${finalBaseUrl}\""
-                                                            }
+                    def remoteFlag = ""
+                    if (params.SLAVE_CLUSTER != 'none') {
+                        def slaveConfig = readProperties file: "config/slave_clusters.properties"
+                        def targetIps = slaveConfig[params.SLAVE_CLUSTER]
+                        if (targetIps != null && targetIps.trim() != "") {
+                            remoteFlag = "-R ${targetIps}"
+                        } else {
+                            echo "CẢNH BÁO: Không tìm thấy IP cho cụm '${params.SLAVE_CLUSTER}'. Bỏ qua chế độ Slave."
+                        }
+                    }
 
-                    // 3. LỆNH CHẠY CHỐT HẠ (Đã bơm đủ đồ chơi)
+                    // 3. LOGIC XỬ LÝ URL (GHI ĐÈ HOẶC LẤY TỪ JMX)
+                    def targetUrlFlag = ""
+                    if (params.TARGET_URL != null && params.TARGET_URL.trim() != "") {
+                        targetUrlFlag = "-JtargetUrl=\"${params.TARGET_URL.trim()}\""
+                    }
+
+                    def baseUrlFlag = ""
+                    if (finalBaseUrl != "") {
+                        baseUrlFlag = "-JbaseUrl=\"${finalBaseUrl}\""
+                    }
+
+                    // 4. LỆNH CHẠY CHỐT HẠ (Đã bơm đủ đồ chơi và fix lỗi biến)
                     sh """
-                                               ${JMETER_HOME}/jmeter -n -t "scripts/${params.SCRIPT_FILENAME}" \
-                                               -l "reports/${reportName}.jtl" \
-                                               -e -o "reports/${reportName}_Dashboard" \
-                                               ${baseUrlFlag} \
-                                               ${targetUrlFlag} \
-                                               -Jthreads="${params.THREADS}" \
-                                               -Jrampup="${params.RAMP_UP}" \
-                                               -Jduration="${jmeterDuration}" \
-                                               -Jloops="${jmeterLoops}" \
-                                               ${remoteFlag}
-                                           """
+                        ${JMETER_HOME}/jmeter -n -t "scripts/${params.SCRIPT_FILENAME}" \
+                        -l "reports/${reportName}.jtl" \
+                        -e -o "reports/${reportName}_Dashboard" \
+                        ${baseUrlFlag} \
+                        ${targetUrlFlag} \
+                        -Jthreads="${params.THREADS}" \
+                        -Jrampup="${params.RAMP_UP}" \
+                        -Jduration="${jmeterDuration}" \
+                        -Jloops="${jmeterLoops}" \
+                        ${remoteFlag}
+                    """
                 }
             }
         }
