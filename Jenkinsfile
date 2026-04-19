@@ -9,7 +9,7 @@ pipeline {
     environment {
         // 2. ÔNG PHẢI SỬA DÒNG NÀY: Trỏ tới thư mục bin của JMeter TRÊN MÁY ẢO LINUX
         // Ví dụ: /home/xuanle/apache-jmeter-5.6.3/bin hoặc /opt/apache-jmeter-5.6.3/bin
-        JMETER_HOME = "/Đường/dẫn/đến/jmeter/bin/của/máy/ảo"
+        JMETER_HOME = "/home/xuanle/Desktop/dowload/apache-jmeter-5.6.3/bin"
     }
 
     stages {
