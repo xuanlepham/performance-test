@@ -14,7 +14,7 @@ pipeline {
         string(name: 'DURATION', defaultValue: '300', description: 'Thời gian ngâm tải Duration bằng giây (Để trống nếu chạy theo Loop)')
 
         // MENU XỔ XUỐNG CHỌN CỤM SLAVE
-        choice(name: 'SLAVE_CLUSTER', choices: ['none', 'slave_1', 'cụm_2_máy', 'cụm_full_3_máy'], description: 'Chọn cụm JMeter Slave (none = Chỉ chạy bằng máy hiện tại)')
+        choice(name: 'SLAVE_CLUSTER', choices: ['VM-Slave', 'slave_1', 'cụm_2_máy', 'cụm_full_3_máy'], description: 'Chọn cụm JMeter Slave (none = Chỉ chạy bằng máy hiện tại)')
     }
 
     environment {
@@ -48,7 +48,7 @@ pipeline {
 
                     // 2. LOGIC TỰ ĐỘNG LẤY IP TỪ FILE CONFIG RIÊNG CỦA ÔNG
                     def remoteFlag = ""
-                    if (params.SLAVE_CLUSTER != 'none') {
+                    if (params.SLAVE_CLUSTER != 'VM-Slave') {
                         def slaveConfig = readProperties file: "config/slave_clusters.properties"
                         def targetIps = slaveConfig[params.SLAVE_CLUSTER]
                         if (targetIps != null && targetIps.trim() != "") {
